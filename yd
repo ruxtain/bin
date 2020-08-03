@@ -1,0 +1,146 @@
+#! /Users/michael/anaconda3/bin/python3
+# @Date:   2018-08-18 17:02:46
+# @Note:   This only works under Mac OS and python3.5+
+
+HELP = '''
+    YouDao Dict Client
+    Version 1.0
+    Copyleft 2018, Michael Tan.
+    Look up words in English-Chinese Dictionary.
+    ... with human pronunciations.
+
+    Usage:
+    yd test
+    yd good morning
+    yd 你好
+'''
+
+from string import ascii_letters, punctuation, whitespace, digits
+from lxml import etree
+import asyncio
+import aiohttp
+import platform
+import time
+import sys
+import os
+
+
+OS_TYPE = platform.system()
+YD_DICT = 'http://dict.youdao.com/w/eng/{word}/#keyfrom=dict2.index'
+YD_READ = 'http://dict.youdao.com/dictvoice?audio={word}&type=2'  # 美式发音
+HEADERS = {
+    'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.84 Safari/537.36'
+}
+
+if OS_TYPE == 'Darwin':
+    READ_FILE = '/Users/michael/bin/src/yd.mpeg'
+    HISTORY = '/Users/michael/bin/src/yd.txt'
+    PROXY = None
+elif OS_TYPE == 'Linux':
+    READ_FILE = '/root/tmp/yd.mpeg'
+    HISTORY = '/mnt/d/src/yd.txt'
+    PROXY = 'http://web-proxy.tencent.com:8080'
+
+
+def view_words():
+    os.system('less {}'.format(HISTORY))
+    exit(0)
+
+
+def get_word():
+    c = sys.argv[1:]
+    if len(c) == 1 and c[0] == 'history':
+        view_words()
+    return '%20'.join(sys.argv[1:])
+
+
+def save_word(word):
+    """ Will not keep track of the meaning, should you forget it,
+    you are welcome to look it up again with `yd`
+    """
+
+    with open(HISTORY, 'a', encoding='utf-8') as f:
+        print(time.strftime('%F %T'), word.replace('%20',''), file=f)
+
+
+def is_english(word):
+    english_chars = ascii_letters + punctuation + whitespace + digits
+    return all([char in english_chars for char in word])
+
+
+def get_english_meaning(tree):
+    [print(li.text, flush=True) for li in tree.xpath('ul/li')]
+
+    
+def get_chinese_meaning(tree):
+    spans = tree.xpath('ul/p/span')
+    if not spans:
+        print('Sorry, can\'t find the word.')
+    else:
+        for span in spans:
+            if span.text:
+                print(span.text, end=' ', flush=True) # 词性
+            else:
+                try:
+                    print(span.xpath('a')[0].text, end='', flush=True) # 具体词义
+                    print(span.xpath('span')[0].text.strip(), end=' ', flush=True) # 分号
+                except:
+                    print(flush=True) # 单纯换行，不要修改
+
+
+async def fetch(url):
+    async with aiohttp.ClientSession(headers=HEADERS) as session:
+        async with session.get(url, proxy=PROXY) as resp:
+            return await resp.read()
+
+
+async def get_audio(word):
+    """ 利用 mac 自带的 afplay 朗读 mpeg 格式的发音文件 """
+
+    if is_english(word) and OS_TYPE == 'Darwin':
+        await asyncio.sleep(0.1) # 确保单词解释先显示，再发音
+        content = await fetch(YD_READ.format(word=word))
+        with open(READ_FILE, 'wb') as f:   
+            f.write(content)
+            # 使用 popen 就不会把外援程序的输出打印到控制台了，而需要 read 函数获取
+            # 使用 -v 选项把音量调小，保护听力，它能发出的最大声音是电脑最大音量的一半
+            output = os.popen('afplay {} -v 0.5'.format(READ_FILE))
+    elif OS_TYPE == 'Windows':
+        print('Sorry, audio feature is not supported on Windows.')
+
+
+async def get_meaning(word):
+    """ 拿到网页进行中英文分别解析 """
+
+    content = await fetch(YD_DICT.format(word=word))
+    content = content.decode('utf-8')    
+    root_tree = etree.HTML(content)
+
+    try:
+        tree = root_tree.xpath('//div[@class="trans-container"]')[0]
+        if 'tWebTrans' in tree.values(): # 访问频繁导致第一项 div 变成网络翻译
+            print('Sh*t happens. Please try again later.')
+            exit(1)
+        else:
+            if is_english(word):
+                get_english_meaning(tree)
+                save_word(word)
+            else:
+                get_chinese_meaning(tree)
+    except IndexError:
+        print('Sorry, can\'t find the word.')
+        exit(1) 
+
+
+def main():
+    word = get_word()
+    if word:
+        tasks = [get_meaning(word), get_audio(word)]
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.wait(tasks))
+    else:
+        print(HELP)
+
+if __name__ == '__main__':
+    main()

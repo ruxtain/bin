@@ -1,2 +1,9 @@
 # bin
-cool and efficient small widget
+各种很酷的小工具
+
+## yd
+基于有道词典的单词查询工具
+
+## new
+用于快速用vi编辑各类我常用脚本的工具
+

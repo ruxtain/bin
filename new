@@ -1,0 +1,75 @@
+#!/Users/michael/anaconda3/bin/python3
+
+import sys
+import os
+
+GO_TEMPLATE = """package main
+
+import (
+    "fmt"
+)
+
+func main() {
+}"""
+
+SCALA_TEMPLATE = """#! /bin/sh
+exec scala -savecompiled "$0" "$@"
+!#
+
+object a { 
+    def main(args: Array[String]): Unit = { 
+    
+    }   
+}"""
+
+PYTHON_TEMPLATE = "#!/Users/michael/anaconda3/bin/python\n\n"
+SHELL_TEMPLATE = "#!/bin/zsh\n\n"
+JAVA_TEMPLATE = """public class %s {
+    public static void main(String[] args) {
+        
+    }
+}
+"""
+
+
+TEMPLATES = {
+    "go": GO_TEMPLATE,
+    "scala": SCALA_TEMPLATE,
+    "py": PYTHON_TEMPLATE,
+    "sh": SHELL_TEMPLATE,
+    "java": JAVA_TEMPLATE,
+}
+
+def make_file(filename):
+    base, ext = filename.split(".")
+    current_path = os.getcwd()
+    template = TEMPLATES[ext]
+    # 针对不同脚本类型的特殊逻辑
+    if ext == 'java':
+        template = template % base
+    newfile = os.path.join(current_path, filename)
+    if not os.path.exists(newfile):
+        with open(newfile, 'w', encoding='utf-8') as f:
+            f.write(template)
+    return newfile, ext, template
+
+if __name__ == '__main__':
+    args = sys.argv[1:]
+    if len(args) == 0: # 直接编辑最新文件
+        cmd = "ls | grep -v \"class$\" | xargs ls -t | head -n 1"
+        newfile = os.popen(cmd).read()
+        # 避免未定义
+        ext = None
+        template = None
+    else:
+        filename = args[0].strip()
+        newfile, ext, template = make_file(filename)
+
+    newfile = newfile.strip()
+    os.system("vi " + newfile)
+
+    # 如果编辑完成后和初始状态没有区别则删除文件
+    with open(newfile, 'r', encoding='utf-8') as f:
+        if f.read() == template:
+            os.remove(newfile)
+
