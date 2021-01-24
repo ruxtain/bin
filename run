@@ -1,0 +1,33 @@
+#!/bin/zsh
+
+if [ $# = 1 ];then
+    newfile=$1
+else
+    # grep -v 排除一些二进制文件
+    newfile=`ls | grep -v "class$" | xargs ls -t | head -n 1` # 获取最新文件
+fi
+
+base=${newfile%.*}
+ext=${newfile##*.}
+
+## for debug
+# echo "newfile=" $newfile
+# echo "ext=" "$ext"
+
+if [ "$ext" = "go" ];then
+    go run $newfile
+elif [ "$ext" = "sh" ];then
+    chmod 775 $newfile
+    zsh $newfile
+elif [ "$ext" = "scala" ];then
+elif [ "$ext" = "scala" ];then
+    scala $newfile
+elif [ "$ext" = "py" ];then
+    python3 $newfile
+elif [ "$ext" = "java" ];then
+    javac $newfile
+    java $base
+else
+    echo "run: unknown extension of" "'$newfile'"
+fi
+

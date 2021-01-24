@@ -1,0 +1,38 @@
+#! /Users/michael/anaconda3/bin/python
+#
+# api如果失效了就看这个链接
+# https://exchangeratesapi.io/
+
+import requests
+import sys
+
+api = "https://api.exchangeratesapi.io/latest?base=CNY"
+
+def get_rates(api):
+    response = requests.get(api)
+    data = response.json()
+    rates = data['rates']
+    return float(rates['HKD']), float(rates['USD'])
+
+
+def main():
+    n = float(sys.argv[1])
+    hkd_rate, usd_rate = get_rates(api)
+
+    res = template = """
+1 RMB = {:.2f} USD
+{:.2f} RMB = {:.2f} USD
+{:.2f} USD = {:.2f} RMB
+
+1 RMB = {:.2F} HKD
+{:.2f} RMB = {:.2f} HKD
+{:.2f} HKD = {:.2f} RMB
+    """.format(
+        usd_rate, n, n*usd_rate, n, n/usd_rate,
+        hkd_rate, n, n*hkd_rate, n, n/hkd_rate
+    ).strip()
+
+    print(res)
+
+if __name__ == '__main__':
+    main()
